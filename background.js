@@ -123,7 +123,7 @@ SnoozeTab.prototype = {
     }
     
     if (_tab.status == "default") {
-      _tab.startTimer(10*1000);
+      _tab.startTimer(5*60*1000);
     }
   },
   onRemoved: function(tabId) {
