@@ -1,0 +1,25 @@
+{
+  "name": "SnoozeTab",
+  "version": "0.1.5",
+  "manifest_version": 2,
+  "description": "o",
+  "icons": {
+    "48": "img/icon48.png",
+    "128": "img/icon48.png"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  /*
+  "background_page": "background.html",
+  /*
+  "options_page": "template/options.html",
+  */
+  "page_action": {
+    "default_title": "hoge",
+    "default_icon" : "img/icon48.png"
+  },
+  "permissions": [
+    "tabs", "http://*/*", "https://*/*"
+  ]
+}
