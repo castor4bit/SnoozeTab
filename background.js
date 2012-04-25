@@ -13,19 +13,23 @@ TabInfo.prototype = {
   timer: null,
   
   reload: function() {
-    console.log("Reload: "+ this.id);
     chrome.tabs.reload(this.id);
   },
   startTimer: function(limit) {
     this.stopTimer();
     
     if (this.url.match(/^https?:\/\//)) {
-      console.log("start timer: "+ this.id);
+      console.log("start timer: "+ this.id +" : "+ this.status);
       
       var _self = this;
       this.timer = setTimeout(function() {
         _self.status = "sleep";
-        chrome.tabs.executeScript(_self.id, {code:"document.body.innerHTML = '';"});
+        
+        chrome.tabs.update(_self.id, { url: "about:blank" }, function(tab) {
+          chrome.tabs.update(_self.id, { url: _self.url }, function(tab) {
+            _self.status = "standby";
+          });
+        });
         console.log("suspended: "+ _self.id);
       }, limit);
     }
@@ -46,15 +50,9 @@ SnoozeTab.prototype = {
   activeTabId: null,
   
   get: function(tabId) {
-    console.log("get tab info: "+ tabId);
-    console.log(this.tabs[tabId]);
-    
     return this.tabs[tabId];
   },
   set: function(tab) {
-    console.log("set tab info: "+ tab.id);
-    console.log(tab);
-    
     if (this.tabs[tab.id]) {
       this.remove(tab.id);
     }
@@ -77,7 +75,9 @@ SnoozeTab.prototype = {
       return;
     }
     
-    this.set(tab);
+    if ((tab.id == this.activeTabId) || (this.status == "default")) {
+      this.set(tab);
+    }
     console.log("tab load completed:"+ tab.id);
     
     if (this.activeTabId && (tab.id != this.activeTabId)) {
@@ -89,17 +89,6 @@ SnoozeTab.prototype = {
     //
     console.log("tab activated: "+ activeInfo.tabId);
     
-    var _tab = this.get(activeInfo.tabId);
-    if (_tab == undefined) {
-      console.log("unknown tab: "+ activeInfo.tabId);
-      
-      var _self = this;
-      chrome.tabs.get(activeInfo.tabId, function(tab) {
-        _self.set(tab);
-      });
-      return;
-    }
-    
     if (this.activeTabId != activeInfo.tabId) {
       console.log("active tab changed: "+ this.activeTabId +" -> "+ activeInfo.tabId);
       this.onDeactivated(this.activeTabId);
@@ -107,9 +96,20 @@ SnoozeTab.prototype = {
     
     this.activeTabId = activeInfo.tabId;
     
+    var _tab = this.get(activeInfo.tabId);
+    if (_tab == undefined) {
+      console.log("unknown tab: "+ activeInfo.tabId);
+      
+      var _self = this;
+      chrome.tabs.get(activeInfo.tabId, function(tab) {
+        _self.set(tab);
+        _self.activeTabId = tab.id;
+      });
+      return;
+    }
     _tab.stopTimer();
     
-    if (_tab.status == "sleep") {
+    if (_tab.status != "default") {
       _tab.reload();
     }
   },
@@ -122,12 +122,25 @@ SnoozeTab.prototype = {
       return;
     }
     
-    _tab.startTimer(5*60*1000);
+    if (_tab.status == "default") {
+      _tab.startTimer(10*1000);
+    }
   },
   onRemoved: function(tabId) {
     console.log("tab removed: "+ tabId);
     
     this.remove(tabId);
+  },
+  onRequest: function(details) {
+    var cancel = false;
+    if ((details.tabId != -1)
+      && (details.tabId != this.activeTabId)
+      && (details.type != "main_frame")
+      && (this.activeTabId != null)) {
+      //
+      cancel = true;
+    }
+    return { cancel: cancel };
   }
 }
 
@@ -137,4 +150,9 @@ var sntab = new SnoozeTab();
 chrome.tabs.onUpdated.addListener  (function(){ sntab.onUpdated.apply(sntab, arguments); });
 chrome.tabs.onRemoved.addListener  (function(){ sntab.onRemoved.apply(sntab, arguments); });
 chrome.tabs.onActivated.addListener(function(){ sntab.onActivated.apply(sntab, arguments); });
-
+/*
+chrome.webRequest.onBeforeRequest.addListener(function(){ sntab.onRequest.apply(sntab, arguments); },
+  { urls: ["<all_urls>"] },
+  [ "blocking" ]
+);
+*/
