@@ -7,4 +7,6 @@
     document.title = r.title;
     document.getElementsByTagName("head")[0].appendChild(favicon);
   });
+  
+  window.onfocus = function(){ history.back(); };
 })();

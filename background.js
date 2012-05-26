@@ -9,11 +9,23 @@ TabInfo.prototype = {
   url: null,
   title: null,
   favicon: null,
-  status: "default",
+  status: "waking",
   timer: null,
   
-  reload: function() {
-    chrome.tabs.update(this.id, { url: this.url });
+  
+  lullaby: function(limit) {
+    if (this.isWaking()) {
+      this.startTimer(limit);
+    }
+  },
+  wakeup: function() {
+    this.stopTimer();
+    if (this.isWaking() == false) {
+      //chrome.tabs.update(this.id, { url: this.url });
+    }
+  },
+  isWaking: function() {
+    return (this.status == "waking");
   },
   startTimer: function(limit) {
     this.stopTimer();
@@ -23,13 +35,12 @@ TabInfo.prototype = {
       
       var _self = this;
       this.timer = setTimeout(function() {
-        _self.status = "sleep";
+        _self.status = "sleeping";
         
         chrome.tabs.update(_self.id, { url: chrome.extension.getURL("dummy.html") }, function(tab) {
-          console.log("===== move to dummy.html <- "+ _self.id +" : "+ _next);
-          _self.status = "standby";
+          console.log("suspended: "+ _self.id +" : "+ _self.title);
+          _self.status = "suspended";
         });
-        console.log("### suspended: "+ _self.id);
       }, limit);
     }
   },
@@ -52,10 +63,7 @@ SnoozeTab.prototype = {
     return this.tabs[tabId];
   },
   set: function(tab) {
-    if (this.tabs[tab.id]) {
-      this.remove(tab.id);
-    }
-    
+    this.remove(tab.id);
     this.tabs[tab.id] = new TabInfo(tab.id, tab.url, tab.title, tab.favIconUrl);
   },
   remove: function(tabId) {
@@ -65,21 +73,26 @@ SnoozeTab.prototype = {
       _tab.stopTimer();
       
       delete this.tabs[tabId];
+      console.log("tab removed: "+ tabId);
     }
   },
   
+  isActive: function(tabId) {
+    return (this.activeTabId && (tabId == this.activeTabId));
+  },
   onUpdated: function(tabId, changeInfo, tab) {
     //
     if (changeInfo.status != "complete") {
       return;
     }
     
-    if ((tab.id == this.activeTabId) || (this.status == "default")) {
+    var _tab = this.get(tab.id);
+    if (this.isActive(tab.id) || (_tab && _tab.isWaking())) {
       this.set(tab);
     }
     console.log("tab load completed:"+ tab.id);
     
-    if (this.activeTabId && (tab.id != this.activeTabId)) {
+    if (this.isActive(tab.id) == false) {
       console.log("inactive tab loaded (deactivate): "+ tab.id +" : "+ this.activeTabId);
       this.onDeactivated(tab.id);
     }
@@ -88,7 +101,7 @@ SnoozeTab.prototype = {
     //
     console.log("tab activated: "+ activeInfo.tabId);
     
-    if (this.activeTabId != activeInfo.tabId) {
+    if (this.isActive(activeInfo.tabId) == false) {
       console.log("active tab changed: "+ this.activeTabId +" -> "+ activeInfo.tabId);
       this.onDeactivated(this.activeTabId);
     }
@@ -106,29 +119,23 @@ SnoozeTab.prototype = {
       });
       return;
     }
-    _tab.stopTimer();
     
-    if (_tab.status != "default") {
-      _tab.reload();
-    }
+    _tab.wakeup();
   },
   onDeactivated: function(tabId) {
     console.log("tab deactivated: "+ tabId);
     
     var _tab = this.get(tabId);
-    if (_tab == undefined) {
+    if (_tab) {
+      _tab.lullaby(1*10*1000);  // limit
+    }
+    /*
+    else {
       console.log("unknown tab (skip): "+ tabId);
-      return;
     }
-    
-    if (_tab.status == "default") {
-      //_tab.startTimer(5*60*1000);
-      _tab.startTimer(1*10*1000);
-    }
+    */
   },
   onRemoved: function(tabId) {
-    console.log("tab removed: "+ tabId);
-    
     this.remove(tabId);
   },
   onRequest: function(details) {
