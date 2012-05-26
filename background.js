@@ -13,7 +13,7 @@ TabInfo.prototype = {
   timer: null,
   
   reload: function() {
-    chrome.tabs.reload(this.id);
+    chrome.tabs.update(this.id, { url: this.url });
   },
   startTimer: function(limit) {
     this.stopTimer();
@@ -25,12 +25,11 @@ TabInfo.prototype = {
       this.timer = setTimeout(function() {
         _self.status = "sleep";
         
-        chrome.tabs.update(_self.id, { url: "about:blank" }, function(tab) {
-          chrome.tabs.update(_self.id, { url: _self.url }, function(tab) {
-            _self.status = "standby";
-          });
+        chrome.tabs.update(_self.id, { url: chrome.extension.getURL("dummy.html") }, function(tab) {
+          console.log("===== move to dummy.html <- "+ _self.id +" : "+ _next);
+          _self.status = "standby";
         });
-        console.log("suspended: "+ _self.id);
+        console.log("### suspended: "+ _self.id);
       }, limit);
     }
   },
@@ -123,7 +122,8 @@ SnoozeTab.prototype = {
     }
     
     if (_tab.status == "default") {
-      _tab.startTimer(5*60*1000);
+      //_tab.startTimer(5*60*1000);
+      _tab.startTimer(1*10*1000);
     }
   },
   onRemoved: function(tabId) {
@@ -150,6 +150,21 @@ var sntab = new SnoozeTab();
 chrome.tabs.onUpdated.addListener  (function(){ sntab.onUpdated.apply(sntab, arguments); });
 chrome.tabs.onRemoved.addListener  (function(){ sntab.onRemoved.apply(sntab, arguments); });
 chrome.tabs.onActivated.addListener(function(){ sntab.onActivated.apply(sntab, arguments); });
+
+chrome.extension.onRequest.addListener(
+  function(request, sender, sendResponse) {
+    console.log("sender.tab.id -> "+ sender.tab.id);
+    var _tab = sntab.get(sender.tab.id);
+    if (_tab) {
+      _res = {
+        title: _tab.title,
+        favicon: _tab.favicon
+      }
+    }
+    sendResponse(_res);
+  }
+);
+
 /*
 chrome.webRequest.onBeforeRequest.addListener(function(){ sntab.onRequest.apply(sntab, arguments); },
   { urls: ["<all_urls>"] },
