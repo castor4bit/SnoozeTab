@@ -1,0 +1,22 @@
+{
+  "name": "SnoozeTab",
+  "version": "0.3.0",
+  "manifest_version": 2,
+
+  "description": "A Chrome Extension that snooze tabs like BarTab.",
+  "icons": {
+    "48": "img/icon48.png",
+    "128": "img/icon128.png"
+  },
+
+  "background": {
+    "persistent": true,
+    "scripts": ["js/background.min.js"]
+  },
+  "update_url": "https://raw.github.com/castor4bit/SnoozeTab/master/dist/SnoozeTab/update.xml",
+  "homepage_url": "https://github.com/castor4bit/SnoozeTab",
+  "permissions": [
+    "tabs",
+    "<all_urls>"
+  ]
+}
